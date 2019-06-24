@@ -25,17 +25,15 @@
 import FreeCAD
 import FreeCADGui
 import Part
-import Path
 import PathScripts
 import PathScripts.PathGui as PathGui
 import PathScripts.PathLog as PathLog
-import PathScripts.PathToolController as PathToolController
 import PathScripts.PathToolEdit as PathToolEdit
 import PathScripts.PathUtil as PathUtil
 
 from PySide import QtCore, QtGui
 
-# Qt tanslation handling
+# Qt translation handling
 def translate(context, text, disambig=None):
     return QtCore.QCoreApplication.translate(context, text, disambig)
 
@@ -112,7 +110,7 @@ class ViewProvider:
 def Create(name = 'Default Tool', tool=None, toolNumber=1):
     PathLog.track(tool, toolNumber)
 
-    obj = PathToolController.Create(name, tool, toolNumber)
+    obj = PathScripts.PathToolController.Create(name, tool, toolNumber)
     ViewProvider(obj.ViewObject)
     return obj
 
@@ -273,7 +271,5 @@ class DlgToolControllerEdit:
 if FreeCAD.GuiUp:
     # register the FreeCAD command
     FreeCADGui.addCommand('Path_ToolController', CommandPathToolController())
-    # and set view provider for creation from template
-    PathToolController.ViewProviderClass = ViewProvider
 
 FreeCAD.Console.PrintLog("Loading PathToolControllerGui... done\n")

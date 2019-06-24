@@ -2622,7 +2622,7 @@ def makeShapeString(String,FontFile,Size = 100,Tracking = 0):
         obrep = obj.ViewObject
         if "PointSize" in obrep.PropertiesList: obrep.PointSize = 1             # hide the segment end points
         select(obj)
-
+    obj.recompute()
     return obj
 
 def clone(obj,delta=None,forcedraft=False):
@@ -5835,8 +5835,9 @@ class _Point(_DraftObject):
 
     def execute(self, obj):
         import Part
-        shape = Part.Vertex(Vector(obj.X.Value,obj.Y.Value,obj.Z.Value))
+        shape = Part.Vertex(Vector(0,0,0))
         obj.Shape = shape
+        obj.Placement.Base = FreeCAD.Vector(obj.X.Value,obj.Y.Value,obj.Z.Value)
 
 class _ViewProviderPoint(_ViewProviderDraft):
     "A viewprovider for the Draft Point object"
