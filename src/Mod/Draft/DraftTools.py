@@ -334,6 +334,8 @@ class SelectPlane(DraftTool):
         self.offset = 0
         if not self.doc:
             return
+        if self.handle():
+            return
         self.ui.selectPlaneUi()
         FreeCAD.Console.PrintMessage(translate("draft", "Pick a face to define the drawing plane")+"\n")
         if plane.alignToSelection(self.offset):
@@ -5301,20 +5303,26 @@ class SetAutoGroup():
             self.ui = FreeCADGui.draftToolBar
             s = FreeCADGui.Selection.getSelection()
             if len(s) == 1:
-                if s[0].isDerivedFrom("App::DocumentObjectGroup") or (Draft.getType(s[0]) in ["Site","Building","Floor"]):
+                if (Draft.getType(s[0]) == "Layer") or \
+                ( FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/BIM").GetBool("AutogroupAddGroups",False) and \
+                (s[0].isDerivedFrom("App::DocumentObjectGroup") or (Draft.getType(s[0]) in ["Site","Building","Floor","BuildingPart",]))):
                     self.ui.setAutoGroup(s[0].Name)
                     return
             self.groups = ["None"]
-            gn = Draft.getGroupNames()
+            gn = [o.Name for o in FreeCAD.ActiveDocument.Objects if Draft.getType(o) == "Layer"]
+            if FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/BIM").GetBool("AutogroupAddGroups",False):
+                gn.extend(Draft.getGroupNames())
             if gn:
                 self.groups.extend(gn)
                 self.labels = ["None"]
+                self.icons = [self.ui.getIcon(":/icons/button_invalid.svg")]
                 for g in gn:
                     o = FreeCAD.ActiveDocument.getObject(g)
                     if o:
                         self.labels.append(o.Label)
+                        self.icons.append(o.ViewObject.Icon)
                 self.ui.sourceCmd = self
-                self.ui.popupMenu(self.labels)
+                self.ui.popupMenu(self.labels,self.icons)
 
     def proceed(self,labelname):
         self.ui.sourceCmd = None
@@ -5569,17 +5577,9 @@ class Draft_Arc_3Points:
             FreeCAD.ActiveDocument.recompute()
 
     def drawArc(self,point,info):
-
         if len(self.points) == 2:
-            import Part
             if point.sub(self.points[1]).Length > 0.001:
-                e = Part.Arc(self.points[0],self.points[1],point).toShape()
-                self.tracker.normal = e.Curve.Axis.negative() # for some reason the axis always points "backwards"
-                self.tracker.basevector = self.tracker.getDeviation()
-                self.tracker.setCenter(e.Curve.Center)
-                self.tracker.setRadius(e.Curve.Radius)
-                self.tracker.setStartPoint(self.points[0])
-                self.tracker.setEndPoint(point)
+                self.tracker.setBy3Points(self.points[0],self.points[1],point)
 
 
 #---------------------------------------------------------------------------
