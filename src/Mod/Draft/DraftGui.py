@@ -262,6 +262,7 @@ def displayExternal(internValue,decimals=None,dim='Length',showUnit=True,unit=No
         uom = "??"
     if not showUnit:
         uom = ""
+    decimals = abs(decimals) # prevent negative values
     fmt = "{0:."+ str(decimals) + "f} "+ uom
     displayExt = fmt.format(float(internValue) / float(conversion))
     displayExt = displayExt.replace(".",QtCore.QLocale().decimalPoint())
@@ -659,6 +660,9 @@ class DraftToolBar:
         self.snapLabel = self._label("snapLabel", gl)
         self.snapValue = self._spinbox("snapValue", gl)
         self.snapValue.setValue(Draft.getParam("snapRange", 8))
+        bl = QtGui.QHBoxLayout()
+        self.layout.addLayout(bl)
+        self.alignToWPButton = self._pushbutton("alignToWP", bl,icon="dagViewVisible")
 
         # spacer
         if not self.taskmode:
@@ -731,6 +735,7 @@ class DraftToolBar:
         QtCore.QObject.connect(self.mainlineValue,QtCore.SIGNAL("valueChanged(int)"),self.setMainline)
         QtCore.QObject.connect(self.centerPlane,QtCore.SIGNAL("stateChanged(int)"),self.setCenterPlane)
         QtCore.QObject.connect(self.snapValue,QtCore.SIGNAL("valueChanged(int)"),self.setSnapValue)
+        QtCore.QObject.connect(self.alignToWPButton,QtCore.SIGNAL("clicked()"),self.alignToWP)
 
         # following lines can cause a crash and are not needed anymore when using the task panel
         # http://forum.freecadweb.org/viewtopic.php?f=3&t=6952
@@ -887,6 +892,8 @@ class DraftToolBar:
         self.centerPlane.setToolTip(translate("draft", "Centers the working plane on the current view"))
         self.snapLabel.setText(translate("draft", "Snapping radius"))
         self.snapValue.setToolTip(translate("draft", "This is the distance in screen pixels under which a point will be snapped. You can also change the radius while drawing, using keys")+" "+inCommandShortcuts["Increase"][0]+" , "+inCommandShortcuts["Decrease"][0])
+        self.alignToWPButton.setText(translate("draft", "Align view"))
+        self.alignToWPButton.setToolTip(translate("draft", "Aligns the view direction to face the current working plane"))
         self.retranslateTray(widget)
 
         # Update the maximum width of the push buttons
@@ -1013,6 +1020,7 @@ class DraftToolBar:
         self.snapValue.show()
         p = Draft.getParam("snapRange", 8)
         self.snapValue.setValue(p)
+        self.alignToWPButton.show()
 
     def extraLineUi(self):
         '''shows length and angle controls'''
@@ -1129,6 +1137,8 @@ class DraftToolBar:
         self.taskUi(translate("draft","Offset"))
         self.radiusUi()
         self.isCopy.show()
+        p = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Draft")
+        self.isCopy.setChecked(p.GetBool("OffsetCopyMode",False))
         self.occOffset.show()
         self.labelRadius.setText(translate("draft","Distance"))
         self.radiusValue.setText(FreeCAD.Units.Quantity(0,FreeCAD.Units.Length).UserString)
@@ -1195,6 +1205,7 @@ class DraftToolBar:
             self.snapLabel.hide()
             self.snapValue.hide()
             self.WPLabel.hide()
+            self.alignToWPButton.hide()
 
     def trimUi(self,title=translate("draft","Trim")):
         self.taskUi(title)
@@ -1336,7 +1347,7 @@ class DraftToolBar:
         self.isCopy.show()
         self.isSubelementMode.show()
         p = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Draft")
-        if p.GetBool("copymode",True):
+        if p.GetBool("copymode",False):
             self.isCopy.setChecked(p.GetBool("copymodeValue",False))
         self.continueCmd.show()
 
@@ -1391,6 +1402,10 @@ class DraftToolBar:
     def setCopymode(self,val=0):
         p = FreeCAD.ParamGet("User parameter:BaseApp/Preferences/Mod/Draft")
         p.SetBool("copymodeValue",bool(val))
+        # special value for offset command
+        if self.sourceCmd:
+            if self.sourceCmd.featureName == "Offset":
+                p.SetBool("OffsetCopyMode",bool(val))
 
     def relocate(self):
         "relocates the right-aligned buttons depending on the toolbar size"
@@ -1706,6 +1721,9 @@ class DraftToolBar:
 
     def selectResetPlane(self):
         self.sourceCmd.selectHandler("reset")
+
+    def alignToWP(self):
+        self.sourceCmd.selectHandler("alignToWP")
 
     def undoSegment(self):
         "undo last line segment"
@@ -2026,7 +2044,7 @@ class DraftToolBar:
     def selectplane(self):
         FreeCADGui.runCommand("Draft_SelectPlane")
 
-    def popupMenu(self,llist,ilist=None):
+    def popupMenu(self,llist,ilist=None,pos=None):
         "pops up a menu filled with the given list"
         self.groupmenu = QtGui.QMenu()
         for i,l in enumerate(llist):
@@ -2034,7 +2052,8 @@ class DraftToolBar:
                 self.groupmenu.addAction(ilist[i],l)
             else:
                 self.groupmenu.addAction(l)
-        pos = FreeCADGui.getMainWindow().cursor().pos()
+        if not pos:
+            pos = FreeCADGui.getMainWindow().cursor().pos()
         self.groupmenu.popup(pos)
         QtCore.QObject.connect(self.groupmenu,QtCore.SIGNAL("triggered(QAction *)"),self.popupTriggered)
 
